@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+    <script>
+class StartScene extends Phaser.Scene {
+    constructor() {
+        super('StartScene');
+    }
+    preload(){
+        this.load.image('front','resourse/front.jpg');
+    }
+    create() {
+        this.front=this.add.tileSprite(0, 0, 800, 400, 'front').setOrigin(0,0);
+        this.front.tileScaleX=0.8;
+        this.front.tileScaleY=0.5;
+        // 在畫面中間寫字
+        this.add.text(400, 200, 'Peter Runner', { fontSize: '48px', fill: '#000'}).setOrigin(0.5);
+        this.add.text(400, 250, '點擊畫面或空白鍵開始', { fontSize: '24px', fill: '#000' }).setOrigin(0.5);
+        this.add.text(120, 100, '本遊戲採用了彼特兔素材,純為練習程式,\n若有冒犯請聯絡開發者，將立刻刪除。', { fontSize: '12px', fill: '#000' }).setOrigin(0.5);
+        this.add.text(250, 130,"This game uses Peter Rabbit assets for coding practice only\n not for profit. If these assets offend any rights, \n please contact the developer and they will be removed immediately.",{fontSize: '12px', fill: '#000' }).setOrigin(0.5);
+        // point will convert to MainScene
+        this.input.on('pointerdown', () => this.scene.start('MainScene'));
+        this.input.keyboard.on('keydown-SPACE', () => this.scene.start('MainScene'));
+    }
+}
+
+class MainScene extends Phaser.Scene {
+    constructor() {
+        super('MainScene');
+    }
+    preload(){
+        this.load.image('background', 'resourse/bg.jpg');
+        this.load.image('mr.m', 'resourse/MR_M.png');
+        this.load.image('ground', 'resourse/ground.png');
+        this.load.image('peter_rabbit', 'resourse/peter.png');
+        this.load.image('carrot','resourse/carrot.png');
+    }
+
+    create() { //背景
+        this.bg = this.add.tileSprite(0, 0, 800, 400, 'background'); //add background(800,600)
+        this.bg.setOrigin(0, 0);
+        this.bg.tileScaleX = 0.40;//adjustment 
+        this.bg.tileScaleY = 0.4;
+        this.ground = this.add.tileSprite(0, 350, 800, 50, 'ground');
+        this.ground.setOrigin(0, 0);
+        this.ground.tileScaleX = 1; 
+        this.ground.tileScaleY = 1.2;
+
+        this.physics.add.existing(this.ground, true); //add phtsics property
+        this.player = this.physics.add.sprite(150, 300, 'peter_rabbit'); //rebbit
+        this.player.setDisplaySize(80, 80);
+        this.player.setCollideWorldBounds(true);//rebbit exist not to escape
+
+        this.obstacles = this.physics.add.group();//MR.M make
+        this.physics.add.collider(this.player, this.obstacles, this.hitObstacle, this.check, this);//rebbit and M,callback hitobstacle
+        //,filiter,this scent to the function (hitObstacle)
+        this.carrot=this.physics.add.group();//carrot maker
+        this.physics.add.overlap(this.player, this.carrot, this.super_rush, null, this); //overlap
+
+        this.physics.add.collider(this.player, this.ground); //no pass
+        this.physics.add.collider(this.obstacles, this.ground);
+        this.cursors = this.input.keyboard.createCursorKeys(); //monitor
+        this.score=0;
+        this.scoreText=this.add.text(16, 16, 'Score: 0', {  //position and string
+            fontSize: '32px',  
+            fill: '#ffffff', //white
+            fontStyle: 'bold',
+            stroke: '#000000', 
+            strokeThickness: 4
+        });
+        this.distance=0;
+        this.speedFactor =0;
+        this.input.on('pointerdown', () => //mouse control
+            { if (this.player.body.touching.down) {
+                this.player.setVelocityY(-700);}});
+
+        this.time.addEvent({ //timing
+            delay: Phaser.Math.Between(2000, 5000), //1.5秒
+            callback: this.spawnObstacle, 
+            callbackScope: this, 
+            loop: false 
+        });
+
+
+        this.time.addEvent({ //timing
+            delay: Phaser.Math.Between(20000, 30000), //1.5秒
+            callback: this.spawncarrot, 
+            callbackScope: this, 
+            loop: false 
+        });
+
+        // fixed position
+        this.scoreText.setScrollFactor(0);
+        } 
+
+    update() { //runrun
+        this.bg.tilePositionX += 2;
+        this.ground.tilePositionX += 4;
+
+        // 按向上鍵就跳起 
+        if ((this.cursors.up.isDown|| this.cursors.space.isDown) && this.player.body.touching.down) {
+            this.player.setVelocityY(-700);
+        }
+
+        this.obstacles.getChildren().forEach(m=> { //take Mr.M out in obstacles and check foreach Mr.M
+            if (m.x < -50) {
+                m.destroy(); // disapper
+            }
+        });
+        this.distance += 4;
+        this.score+=1;
+        if(this.distance>4000){
+            this.speedFactor=Math.floor((this.distance)/4000);
+        }
+        this.scoreText.setText('Score: ' + Math.floor(this.score));
+    }
+
+    check(){
+        if(this.super_peter){
+            return false;}
+        return true
+    }
+
+    hitObstacle(player, obstacles){
+        this.physics.pause();
+        this.player.setTint(0xff0000);
+        this.scene.start("endScene", { score: Math.floor(this.score) });
+    }
+
+    spawnObstacle() {
+        let x = 800; // born in the right
+        let y = 300; // on floor
+        
+        // born M
+        let m = this.obstacles.create(x, y, 'mr.m');
+        
+        m.setDisplaySize(70, 90); //zoom out Mr.M
+        m.setVelocityX(-400-(50*this.speedFactor));
+        m.setCollideWorldBounds(false); 
+        
+        this.time.addEvent({
+            delay: Phaser.Math.Between(2000, 5000),
+            callback: this.spawnObstacle,
+            callbackScope: this,
+            loop: false});
+    }
+
+    spawncarrot(){
+        let c=this.carrot.create(0,0,"carrot");
+        c.x=800
+        c.y=Phaser.Math.Between(0, 350);
+        
+        c.body.allowGravity = false;
+        c.setDisplaySize(70,70);
+        c.setVelocityX(-200);
+        c.setCollideWorldBounds(false);
+
+        this.time.addEvent({ //timing
+        delay: Phaser.Math.Between(20000, 30000), //1.5秒
+        callback: this.spawncarrot, 
+        callbackScope: this, 
+        loop: false 
+    });
+    }
+
+    super_rush(player, Carrot){
+        Carrot.destroy();
+        if (this.super_peter){
+            return;
+        }
+        this.super_peter=true;
+        this.player.setTint(0xffff00);
+        this.player.setVelocityX(0);
+        this.time.delayedCall(5000, () => {
+            this.super_peter = false;    // becoming,normal_peter
+            this.player.clearTint();     // no blinblin
+            this.player.setVelocityX(0); // become normal
+        },[],this);
+    }}
+
+class endScene extends Phaser.Scene {
+    constructor(){
+        super("endScene");
+    }
+    init(data) {
+        //Score transferred
+        this.Score = data.score || 0;
+    }
+    preload(){
+        this.load.image('end','resourse/end.jpg');
+    }
+    create(){
+        this.end=this.add.tileSprite(0,0,800,400,'end').setOrigin(0,0);
+        this.end.tileScaleY=0.5
+        this.end.tileScaleX=800/670
+        let restartbutton=this.add.text(400, 100, 'Restart', { fontSize: '48px', fill: '#17df56'}).setOrigin(0.5)
+        this.add.text(600, 120, "Score:"+this.Score, { fontSize: '24px', fill: '#000'}).setOrigin(0.5)
+        restartbutton.setInteractive();
+        restartbutton.on('pointerdown', () => {
+            this.scene.start('MainScene');
+            });
+    }
+}
+
+
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 400,
+    physics: {
+        default: 'arcade', // phsicle engine
+        arcade: {
+            gravity: { y: 1400 }, 
+            debug: false
+        }
+    },
+    scene: [StartScene, MainScene,endScene] 
+};
+const game = new Phaser.Game(config);
+
+    </script>
+</body>
+</html>
